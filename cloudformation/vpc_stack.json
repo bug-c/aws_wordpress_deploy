@@ -1,0 +1,249 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "AWS CloudFormation Template: Create VPC and subnets",
+
+  "Parameters" : {
+
+    "VPCname" : {
+      "Description" : "VPC Name",
+      "Type" : "String",
+	  "Default" : "ExampleVPC",
+      "ConstraintDescription" : "must be a valid VPC name."
+    },
+
+    "VPCipv4" : {
+      "Description" : "VPC IPv4 CIDR",
+      "Type" : "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default" : "192.0.2.0/24",
+      "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription" : "must be a valid CIDR range of the form x.x.x.x/x."
+    },
+
+    "SUBNET1ipv4" : {
+      "Description" : "VPC subnet1 IPv4 CIDR",
+      "Type" : "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default" : "192.0.2.0/25",
+      "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription" : "must be a valid CIDR range of the form x.x.x.x/x."
+    },
+
+    "SUBNET1zone" : {
+      "Description" : "VPC subnet1 AvailabilityZone",
+      "Type" : "String",
+      "Default" : "eu-west-1a"
+    },
+	
+    "SUBNET2ipv4" : {
+      "Description" : "VPC subnet1 IPv4 CIDR",
+      "Type" : "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default" : "192.0.2.128/25",
+      "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription" : "must be a valid CIDR range of the form x.x.x.x/x."
+    },
+	
+    "SUBNET2zone" : {
+      "Description" : "VPC subnet2 AvailabilityZone",
+      "Type" : "String",
+      "Default" : "eu-west-1b"
+    }
+
+  },
+
+  "Mappings" : {
+  },
+
+  "Resources" : {
+
+    "VPC" : {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "CidrBlock" : { "Ref" : "VPCipv4" },
+        "EnableDnsSupport" : "true",
+        "EnableDnsHostnames" : "true",
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Name", "Value" : { "Ref" : "VPCname" } },
+		  { "Key" : "Network", "Value" : "Public" }
+        ]
+      }
+    },
+
+    "PublicSubnet1" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+	    "AvailabilityZone": { "Ref" : "SUBNET1zone" },
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : { "Ref" : "SUBNET1ipv4" },
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Public" }
+        ]
+      }
+    },
+
+    "PublicSubnet2" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+		"AvailabilityZone": { "Ref" : "SUBNET2zone" },
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : { "Ref" : "SUBNET2ipv4" },
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Public" }
+        ]
+      }
+    },
+	
+    "InternetGateway" : {
+      "Type" : "AWS::EC2::InternetGateway",
+      "Properties" : {
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Public" }
+        ]
+      }
+    },
+
+    "GatewayToInternet" : {
+       "Type" : "AWS::EC2::VPCGatewayAttachment",
+       "Properties" : {
+         "VpcId" : { "Ref" : "VPC" },
+         "InternetGatewayId" : { "Ref" : "InternetGateway" }
+       }
+    },
+	
+	"PublicELB" : {
+	   "Type" : "AWS::EC2::SecurityGroup",
+	   "Properties" : {
+		  "GroupDescription" : "Allow http and https public access",
+		  "VpcId" : {"Ref" : "VPC"},
+		  "SecurityGroupIngress" : [{
+				"IpProtocol" : "tcp",
+				"FromPort" : "80",
+				"ToPort" : "80",
+				"CidrIp" : "0.0.0.0/0"
+			 },{
+				"IpProtocol" : "tcp",
+				"FromPort" : "443",
+				"ToPort" : "443",
+				"CidrIp" : "0.0.0.0/0"
+			 }],
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } }
+        ]
+	   }
+	},
+
+	"WWWCache" : {
+	   "Type" : "AWS::EC2::SecurityGroup",
+	   "Properties" : {
+		  "GroupDescription" : "Allow http access from ELB",
+		  "VpcId" : {"Ref" : "VPC"},
+		  "SecurityGroupIngress" : [{
+				"IpProtocol" : "tcp",
+				"FromPort" : "80",
+				"ToPort" : "80",
+				"SourceSecurityGroupId" : {"Ref" : "PublicELB"}
+			 }],
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } }
+        ]
+	   }
+	},
+	
+	"InternalELB" : {
+	   "Type" : "AWS::EC2::SecurityGroup",
+	   "Properties" : {
+		  "GroupDescription" : "Allow http access from WWWCache",
+		  "VpcId" : {"Ref" : "VPC"},
+		  "SecurityGroupIngress" : [{
+				"IpProtocol" : "tcp",
+				"FromPort" : "80",
+				"ToPort" : "80",
+				"SourceSecurityGroupId" : {"Ref" : "WWWCache"}
+			 }],
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } }
+        ]
+	   }
+	},
+
+	"WWWApp" : {
+	   "Type" : "AWS::EC2::SecurityGroup",
+	   "Properties" : {
+		  "GroupDescription" : "Allow http access from Internal ELB",
+		  "VpcId" : {"Ref" : "VPC"},
+		  "SecurityGroupIngress" : [{
+				"IpProtocol" : "tcp",
+				"FromPort" : "80",
+				"ToPort" : "80",
+				"SourceSecurityGroupId" : {"Ref" : "InternalELB"}
+			 }],
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } }
+        ]
+	   }
+	},
+	
+	"DB" : {
+	   "Type" : "AWS::EC2::SecurityGroup",
+	   "Properties" : {
+		  "GroupDescription" : "Allow mysql access from WWWApp",
+		  "VpcId" : {"Ref" : "VPC"},
+		  "SecurityGroupIngress" : [{
+				"IpProtocol" : "tcp",
+				"FromPort" : "3306",
+				"ToPort" : "3306",
+				"SourceSecurityGroupId" : {"Ref" : "WWWApp"}
+			 }],
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } }
+        ]
+	   }
+	}
+	
+
+  },
+
+  "Outputs" : {
+    "VPCId" : {
+      "Description" : "VPCId of the newly created VPC",
+      "Value" :  { "Ref" : "VPC" }
+    },
+    "PublicSubnet1" : {
+      "Description" : "SubnetId of the public subnet",
+      "Value" :  { "Ref" : "PublicSubnet1" }
+    },
+    "PublicSubnet2" : {
+      "Description" : "SubnetId of the public subnet",
+      "Value" :  { "Ref" : "PublicSubnet2" }
+    },
+    "PublicELB" : {
+      "Description" : "PublicELB security group id",
+      "Value" :  { "Ref" : "PublicELB" }
+    },
+    "WWWCache" : {
+      "Description" : "WWWCache security group id",
+      "Value" :  { "Ref" : "WWWCache" }
+    },
+    "InternalELB" : {
+      "Description" : "InternalELB security group id",
+      "Value" :  { "Ref" : "InternalELB" }
+    },
+    "WWWApp" : {
+      "Description" : "WWWApp security group id",
+      "Value" :  { "Ref" : "WWWApp" }
+    },
+    "DB" : {
+      "Description" : "DB security group id",
+      "Value" :  { "Ref" : "DB" }
+    }
+  }
+}
