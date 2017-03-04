@@ -44,5 +44,9 @@ find -type f -exec chmod 644 {} \;
 rm /var/www/html/${PROJECT}
 ln -s /var/www/html/${PROJECT}-${TAG} /var/www/html/${PROJECT}
 
+#Reload nginx and restart php-fpm
+sudo systemctl restart php71-php-fpm
+sudo systemctl reload nginx
+
 #Release lock
 flock -u 200
