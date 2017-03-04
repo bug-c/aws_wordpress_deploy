@@ -11,7 +11,7 @@ PROJECT="$1"
 ENVIRONMENT="$2"
 S3_DIST_REPO="$3"
 S3_DIST_REGION="$4"
-HEALTH_CHK_FILE="$5"
+HEALTH_CHK_FILE="elb-healthcheck-app-298fvd78.php"
 
 #Get deploy config
 aws s3 cp ${S3_DIST_REPO}/${PROJECT}/${ENVIRONMENT}/deploy.conf /home/centos/deploy.conf --region ${S3_DIST_REGION}
