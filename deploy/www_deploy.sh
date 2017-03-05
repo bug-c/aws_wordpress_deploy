@@ -19,7 +19,7 @@ source /home/centos/deploy.conf
 
 #Get dist
 aws s3 cp s3://${S3_DIST_REPO}/${PROJECT}/${ENVIRONMENT}/dist/${TAG}.tar.gz /home/centos/ --region ${S3_DIST_REGION}
-mkdir -p /home/centos/${PROJECT}-${TAG}
+mkdir -p /var/www/html/${PROJECT}-${TAG}
 tar -zxf /home/centos/${TAG}.tar.gz -C /var/www/html/${PROJECT}-${TAG}
 cd /var/www/html/${PROJECT}-${TAG}
 
@@ -41,8 +41,7 @@ find -type d -exec chmod 755 {} \;
 find -type f -exec chmod 644 {} \;
 
 #Create symlink
-rm /var/www/html/${PROJECT}
-ln -s /var/www/html/${PROJECT}-${TAG} /var/www/html/${PROJECT}
+ln -sf /var/www/html/${PROJECT}-${TAG} /var/www/html/${PROJECT}
 
 #Reload nginx and restart php-fpm
 sudo systemctl restart php71-php-fpm
