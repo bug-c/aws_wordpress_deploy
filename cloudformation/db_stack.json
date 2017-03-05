@@ -55,7 +55,7 @@
       "ConstraintDescription" : "must be a valid subnet name."
     },
     "Subnet2": {
-      "Description" : "The EC2 security group that contains instances that need access to the database",
+      "Description" : "VPC subnet2",
       "Type": "String",
       "AllowedPattern" : "[a-zA-Z0-9\\-]+",
       "ConstraintDescription" : "must be a valid subnet name."
