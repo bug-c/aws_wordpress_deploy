@@ -14,11 +14,11 @@ S3_DIST_REGION="$4"
 HEALTH_CHK_FILE="elb-healthcheck-app-298fvd78.php"
 
 #Get deploy config
-aws s3 cp ${S3_DIST_REPO}/${PROJECT}/${ENVIRONMENT}/deploy.conf /home/centos/deploy.conf --region ${S3_DIST_REGION}
+aws s3 cp s3://${S3_DIST_REPO}/${PROJECT}/${ENVIRONMENT}/deploy.conf /home/centos/deploy.conf --region ${S3_DIST_REGION}
 source /home/centos/deploy.conf
 
 #Get dist
-aws s3 cp ${S3_DIST_REPO}/${PROJECT}/${ENVIRONMENT}/dist/${TAG}.tar.gz /home/centos/ --region ${S3_DIST_REGION}
+aws s3 cp s3://${S3_DIST_REPO}/${PROJECT}/${ENVIRONMENT}/dist/${TAG}.tar.gz /home/centos/ --region ${S3_DIST_REGION}
 mkdir -p /home/centos/${PROJECT}-${TAG}
 tar -zxf /home/centos/${TAG}.tar.gz -C /var/www/html/${PROJECT}-${TAG}
 cd /var/www/html/${PROJECT}-${TAG}
