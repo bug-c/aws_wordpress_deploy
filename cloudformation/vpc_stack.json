@@ -228,6 +228,23 @@
 	   }
 	},
 	
+	"Admin" : {
+	   "Type" : "AWS::EC2::SecurityGroup",
+	   "Properties" : {
+		  "GroupDescription" : "Allow admin access",
+		  "VpcId" : {"Ref" : "VPC"},
+		  "SecurityGroupIngress" : [{
+				"IpProtocol" : "tcp",
+				"FromPort" : "22",
+				"ToPort" : "22",
+				"CidrIp" : "0.0.0.0/0"
+			 }],
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } }
+        ]
+	   }
+	},
+	
 	"DB" : {
 	   "Type" : "AWS::EC2::SecurityGroup",
 	   "Properties" : {
@@ -276,6 +293,10 @@
     "WWWApp" : {
       "Description" : "WWWApp security group id",
       "Value" :  { "Ref" : "WWWApp" }
+    },
+    "Admin" : {
+      "Description" : "Admin security group id",
+      "Value" :  { "Ref" : "Admin" }
     },
     "DB" : {
       "Description" : "DB security group id",
