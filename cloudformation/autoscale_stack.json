@@ -1,0 +1,745 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "Loadbalancing and autoscaling Template.",
+
+  "Parameters": {
+    "InstanceType": {
+      "Description": "WebServer EC2 instance type",
+      "Type": "String",
+      "Default": "t2.micro",
+      "AllowedValues": [ "t1.micro", "t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "c1.medium", "c1.xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge", "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge", "g2.2xlarge", "g2.8xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "hi1.4xlarge", "hs1.8xlarge", "cr1.8xlarge", "cc2.8xlarge", "cg1.4xlarge"],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+
+    "KeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+    },
+	
+    "PROJECT": {
+      "Description": "PROJECT",
+      "Type": "String",
+      "ConstraintDescription": "Must be an existent project name."
+    },
+
+    "ENVIRONMENT": {
+      "Description": "ENVIRONMENT",
+      "Type": "String",
+      "Default": "Testing",
+      "AllowedValues": [ "Production", "Staging", "Testing"],
+      "ConstraintDescription": "Must be an existent environment name."
+    },
+	
+    "S3DISTREPO": {
+      "Description": "S3_DIST_REPO",
+      "Type": "String",
+      "ConstraintDescription": "Must be an existent s3 bucket."
+    },
+	
+    "S3DISTREGION": {
+      "Description": "S3_DIST_REGION",
+      "Type": "String",
+      "Default": "eu-west-1",
+      "AllowedValues": [ "us-east-1","us-west-2","us-west-1","eu-west-1","eu-west-2","eu-central-1","ap-southeast-1","ap-northeast-1","ap-northeast-2","ap-southeast-2","ap-south-1","us-east-2","ca-central-1","sa-east-1","cn-north-1" ],
+      "ConstraintDescription": "Must be a valid aws region."
+    },
+	
+    "OperatorEMail": {
+      "Description": "EMail address to notify if there are any scaling operations",
+      "Type": "String",
+      "AllowedPattern": "([a-zA-Z0-9_\\-\\.]+)@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.)|(([a-zA-Z0-9\\-]+\\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\\]?)",
+      "ConstraintDescription": "must be a valid email address."
+    }
+  },
+  
+  "Mappings": {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "PV64"   },
+      "t2.nano"     : { "Arch" : "HVM64"  },
+      "t2.micro"    : { "Arch" : "HVM64"  },
+      "t2.small"    : { "Arch" : "HVM64"  },
+      "t2.medium"   : { "Arch" : "HVM64"  },
+      "t2.large"    : { "Arch" : "HVM64"  },
+      "m1.small"    : { "Arch" : "PV64"   },
+      "m1.medium"   : { "Arch" : "PV64"   },
+      "m1.large"    : { "Arch" : "PV64"   },
+      "m1.xlarge"   : { "Arch" : "PV64"   },
+      "m2.xlarge"   : { "Arch" : "PV64"   },
+      "m2.2xlarge"  : { "Arch" : "PV64"   },
+      "m2.4xlarge"  : { "Arch" : "PV64"   },
+      "m3.medium"   : { "Arch" : "HVM64"  },
+      "m3.large"    : { "Arch" : "HVM64"  },
+      "m3.xlarge"   : { "Arch" : "HVM64"  },
+      "m3.2xlarge"  : { "Arch" : "HVM64"  },
+      "m4.large"    : { "Arch" : "HVM64"  },
+      "m4.xlarge"   : { "Arch" : "HVM64"  },
+      "m4.2xlarge"  : { "Arch" : "HVM64"  },
+      "m4.4xlarge"  : { "Arch" : "HVM64"  },
+      "m4.10xlarge" : { "Arch" : "HVM64"  },
+      "c1.medium"   : { "Arch" : "PV64"   },
+      "c1.xlarge"   : { "Arch" : "PV64"   },
+      "c3.large"    : { "Arch" : "HVM64"  },
+      "c3.xlarge"   : { "Arch" : "HVM64"  },
+      "c3.2xlarge"  : { "Arch" : "HVM64"  },
+      "c3.4xlarge"  : { "Arch" : "HVM64"  },
+      "c3.8xlarge"  : { "Arch" : "HVM64"  },
+      "c4.large"    : { "Arch" : "HVM64"  },
+      "c4.xlarge"   : { "Arch" : "HVM64"  },
+      "c4.2xlarge"  : { "Arch" : "HVM64"  },
+      "c4.4xlarge"  : { "Arch" : "HVM64"  },
+      "c4.8xlarge"  : { "Arch" : "HVM64"  },
+      "g2.2xlarge"  : { "Arch" : "HVMG2"  },
+      "g2.8xlarge"  : { "Arch" : "HVMG2"  },
+      "r3.large"    : { "Arch" : "HVM64"  },
+      "r3.xlarge"   : { "Arch" : "HVM64"  },
+      "r3.2xlarge"  : { "Arch" : "HVM64"  },
+      "r3.4xlarge"  : { "Arch" : "HVM64"  },
+      "r3.8xlarge"  : { "Arch" : "HVM64"  },
+      "i2.xlarge"   : { "Arch" : "HVM64"  },
+      "i2.2xlarge"  : { "Arch" : "HVM64"  },
+      "i2.4xlarge"  : { "Arch" : "HVM64"  },
+      "i2.8xlarge"  : { "Arch" : "HVM64"  },
+      "d2.xlarge"   : { "Arch" : "HVM64"  },
+      "d2.2xlarge"  : { "Arch" : "HVM64"  },
+      "d2.4xlarge"  : { "Arch" : "HVM64"  },
+      "d2.8xlarge"  : { "Arch" : "HVM64"  },
+      "hi1.4xlarge" : { "Arch" : "HVM64"  },
+      "hs1.8xlarge" : { "Arch" : "HVM64"  },
+      "cr1.8xlarge" : { "Arch" : "HVM64"  },
+      "cc2.8xlarge" : { "Arch" : "HVM64"  }
+    },
+
+    "WWWAppAMI" : {
+      "eu-west-1"        : {"PV64" : "ami-XXXXXX", "HVM64" : "ami-XXXXXX", "HVMG2" : "ami-XXXXXX"}
+    },
+
+    "WWWCacheAMI" : {
+      "eu-west-1"        : {"PV64" : "ami-XXXXXX", "HVM64" : "ami-XXXXXX", "HVMG2" : "ami-XXXXXX"}
+    },
+
+    "AWSRegionsNameMapping" : {
+		"eu-west-1" : {"RegionName":"Ireland"},
+		"eu-west-2" : {"RegionName":"London"}
+    },
+	
+    "SSLmapping" : {
+		"www.example.com" : {
+			"Ireland" : "arn:aws:acm:eu-west-1:xxxxxxxxx:certificate/xxxxxxxxxxxxx"
+		}
+    },
+	
+	"VPCid" : {
+		"eu-west-1" : {"ID" : "vpc-XXXXXX"}
+	},
+	
+    "SecurityGroups" : {
+		"eu-west-1" : {
+			"PublicELB" : "sg-XXXXXX",
+			"WWWCache" : "sg-XXXXXX",
+			"InternalELB" : "sg-XXXXXX",
+			"WWWApp" : "sg-XXXXXX",
+			"Admin" : "sg-XXXXXX"
+		}
+    },
+	
+	"Subnets" : {
+		"eu-west-1" : {
+			"Subnet1": "subnet-XXXXXX",
+			"Subnet2": "subnet-XXXXXX"
+		}
+	},
+	
+	"AvailablityZone": {
+		"eu-west-1" : {"zone1":"eu-west-1a", "zone2":"eu-west-1b"}
+	},
+	
+	"EC2Role": {
+		"instanceprofile" : {"arn":"arn:aws:iam::xxxx:instance-profile/xxxxxxxx"}
+	}
+	
+
+  },
+
+  "Resources": {
+    "NotificationTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [ { "Endpoint": { "Ref": "OperatorEMail" }, "Protocol": "email" } ]
+      }
+    },
+
+    "PublicElasticLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+		"Scheme" : "internet-facing",
+		"Subnets" : [
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet1"]}, 
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet2"]}
+		],
+		"LoadBalancerAttributes" : [
+			{ "Key" : "idle_timeout.timeout_seconds", "Value" : "50" }
+		],
+		"SecurityGroups": [{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"PublicELB"]},{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"Admin"]}],
+		"Tags" : [
+		  { "Key" : "key", "Value" : "value" }
+		]
+      }
+    },
+	"PublicListenerHTTP": {
+	  "Type": "AWS::ElasticLoadBalancingV2::Listener",
+	  "Properties": {
+		"DefaultActions": [{
+		  "Type": "forward",
+		  "TargetGroupArn": { "Ref": "CacheTargetGroup" }
+		}],
+		"LoadBalancerArn": { "Ref": "PublicElasticLoadBalancer" },
+		"Port": "80",
+		"Protocol": "HTTP"
+	  }
+	},
+	"PublicListenerHTTPS": {
+	  "Type": "AWS::ElasticLoadBalancingV2::Listener",
+	  "Properties": {
+		"Certificates": [{
+			"CertificateArn": {
+				"Fn::FindInMap" : [
+					"SSLmapping",
+					{ "Ref" : "PROJECT" },{
+					"Fn::FindInMap" : [
+						"AWSRegionsNameMapping", { "Ref" : "AWS::Region" }, "RegionName"
+					]
+				}]
+			}
+		}],
+		"DefaultActions": [{
+		  "Type": "forward",
+		  "TargetGroupArn": { "Ref": "CacheTargetGroup" }
+		}],
+		"LoadBalancerArn": { "Ref": "PublicElasticLoadBalancer" },
+		"Port": "443",
+		"Protocol": "HTTPS",
+		"SslPolicy": "ELBSecurityPolicy-TLS-1-2-2017-01"
+	  }
+	},
+	"CacheTargetGroup" : {
+	  "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+	  "Properties" : {
+		"HealthCheckIntervalSeconds": 30,
+		"HealthCheckPath": "/elb-healthcheck-cache.html",
+		"HealthCheckProtocol": "HTTP",
+		"HealthCheckTimeoutSeconds": 10,
+		"HealthyThresholdCount": 4,
+		"Matcher" : {
+		  "HttpCode" : "200"
+		},
+		"Name": { "Fn::Join": [ "-", [ { "Ref" : "AWS::StackName" },"CacheELBTargets"  ] ] },
+		"Port": 80,
+		"Protocol": "HTTP",
+		"TargetGroupAttributes": [{
+			"Key": "deregistration_delay.timeout_seconds",
+			"Value": "20"
+		},{
+			"Key": "stickiness.enabled",
+			"Value": "true"
+		},{
+			"Key": "stickiness.lb_cookie.duration_seconds",
+			"Value": "60"
+		},{
+			"Key": "stickiness.type",
+			"Value": "lb_cookie"
+		}],
+		"Targets": [
+		],
+		"UnhealthyThresholdCount": 3,
+		"VpcId": {"Fn::FindInMap" : ["VPCid",{ "Ref" : "AWS::Region" },"ID"]},
+		"Tags" : [
+		  { "Key" : "key", "Value" : "value" }
+		]
+	  }
+	},
+	"CacheWebServerGroup" : {
+	   "Type" : "AWS::AutoScaling::AutoScalingGroup",
+	   "Properties" : {
+		  "AvailabilityZones" : [
+			{"Fn::FindInMap" : ["AvailablityZone", { "Ref" : "AWS::Region" }, "zone1"]},
+			{"Fn::FindInMap" : ["AvailablityZone", { "Ref" : "AWS::Region" }, "zone2"]}
+		  ],
+		  "VPCZoneIdentifier": [
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet1"]}, 
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet2"]}
+		  ],
+		  "HealthCheckGracePeriod": "120",
+		  "HealthCheckType": "ELB",
+		  "LaunchConfigurationName" : { "Ref" : "CacheLaunchConfig" },
+		  "MinSize" : "1",
+		  "MaxSize" : "3",
+		  "NotificationConfiguration" : {
+			"TopicARN" : { "Ref" : "NotificationTopic" },
+			"NotificationTypes" : [ "autoscaling:EC2_INSTANCE_LAUNCH",
+                                  "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                                  "autoscaling:EC2_INSTANCE_TERMINATE",
+                                  "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"]
+		  },
+		  "TargetGroupARNs" : [ { "Ref" : "CacheTargetGroup" } ],
+		  "MetricsCollection": [
+			 {
+				"Granularity": "1Minute",
+				"Metrics": [
+				   "GroupMinSize",
+				   "GroupMaxSize"
+				]
+			 }
+		  ],
+		  "Tags": [{
+			"Key" : "Name",
+			"Value" : {"Fn::Join": ["-", ["WWW Cache",{ "Ref" : "AWS::StackName" }]]},
+			"PropagateAtLaunch" : "true"
+		  },{
+			"Key" : "SERVICE",
+			"Value" : "www cache",
+			"PropagateAtLaunch" : "true"
+		  },{
+			"Key" : "PROJECT",
+			"Value" : { "Ref" : "PROJECT" },
+			"PropagateAtLaunch" : "true"
+		  },{
+			"Key" : "ENVIRONMENT",
+			"Value" : { "Ref" : "ENVIRONMENT" },
+			"PropagateAtLaunch" : "true"
+		  }]
+	   },
+	   "CreationPolicy" : {
+		"ResourceSignal" : {
+		  "Timeout" : "PT15M",
+		  "Count"   : "1"
+		}
+	  },
+	  "UpdatePolicy" : {
+		"AutoScalingRollingUpdate" : {
+			"MaxBatchSize" : "1",
+			"MinInstancesInService" : "1",
+			"PauseTime" : "PT15M",
+			"WaitOnResourceSignals": "true"
+		}
+	  }
+	},
+	"CacheLaunchConfig" : {
+	   "Type" : "AWS::AutoScaling::LaunchConfiguration",
+	   "Properties" : {
+		  "AssociatePublicIpAddress" : "true",
+		  "KeyName" : { "Ref" : "KeyName" },
+		  "ImageId" : {
+			 "Fn::FindInMap" : [
+				"WWWCacheAMI",
+				{ "Ref" : "AWS::Region" },
+				{
+				   "Fn::FindInMap" : [
+					  "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch"
+				   ]
+				}
+			 ]
+		  },
+		  "IamInstanceProfile": {"Fn::FindInMap" : ["EC2Role","instanceprofile","arn"]},
+		  "InstanceMonitoring": true,
+		  "SecurityGroups": [{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"WWWCache"]},{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"Admin"]}],
+		  "InstanceType" : { "Ref" : "InstanceType" },
+          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+				 "#!/bin/bash -xe\n",
+				 "# Install the files and packages from the metadata\n",
+				 
+				 "sed -i 's/internal-elb-hostname/",{ "Fn::GetAtt": [ "InternalElasticLoadBalancer", "DNSName" ] },"/g' /etc/nginx/nginx.conf\n",
+				
+				 "/opt/aws/bin/cfn-init -v ",
+				 "         --stack ", { "Ref" : "AWS::StackName" },
+				 "         --resource CacheLaunchConfig ",
+				 "         --region ", { "Ref" : "AWS::Region" }, "\n",
+				 
+				 "# Signal the status from cfn-init\n",
+				 "/opt/aws/bin/cfn-signal -e $? ",
+				 "         --stack ", { "Ref" : "AWS::StackName" },
+				 "         --resource CacheWebServerGroup ",
+				 "         --region ", { "Ref" : "AWS::Region" }, "\n"
+		   ]]}}
+	   },
+       "Metadata" : {
+			"AWS::CloudFormation::Init" : {
+				  "config" : {
+					"files" : {
+						"/etc/cfn/cfn-hup.conf" : {
+							"content" : { "Fn::Join" : ["", [
+							  "[main]\n",
+							  "stack=", { "Ref" : "AWS::StackId" }, "\n",
+							  "region=", { "Ref" : "AWS::Region" }, "\n"
+							]]},
+							"mode"    : "000400",
+							"owner"   : "root",
+							"group"   : "root"
+						  },
+						  "/etc/cfn/hooks.d/cfn-auto-reloader.conf" : {
+							"content": { "Fn::Join" : ["", [
+							  "[cfn-auto-reloader-hook]\n",
+							  "triggers=post.update\n",
+							  "path=Resources.CacheLaunchConfig.Metadata.AWS::CloudFormation::Init\n",
+							  "action=/opt/aws/bin/cfn-init -v ",
+							  "         --stack ", { "Ref" : "AWS::StackName" },
+							  "         --resource CacheLaunchConfig ",
+							  "         --region ", { "Ref" : "AWS::Region" }, "\n",
+							  "runas=root\n"
+							]]}
+						  }
+					},
+					
+					"services" : {
+					  "sysvinit" : {
+						"nginx" : { "enabled" : "true", "ensureRunning" : "true" },
+						"cfn-hup" : { "enabled" : "true", "ensureRunning" : "true",
+									  "files" : ["/etc/cfn/cfn-hup.conf", "/etc/cfn/hooks.d/cfn-auto-reloader.conf"]}
+					  }
+					}
+				  }
+		}
+      }
+	},
+    "CacheWebServerScaleUpPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "CacheWebServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "1"
+      }
+    },
+    "CacheWebServerScaleDownPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "CacheWebServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "-1"
+      }
+    },
+    "CacheCPUAlarmHigh": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-up if CPU > 50% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "90",
+        "AlarmActions": [ { "Ref": "CacheWebServerScaleUpPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "CacheWebServerGroup" }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+    "CacheCPUAlarmLow": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-down if CPU < 40% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "70",
+        "AlarmActions": [ { "Ref": "CacheWebServerScaleDownPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "CacheWebServerGroup" }
+          }
+        ],
+        "ComparisonOperator": "LessThanThreshold"
+      }
+    },
+	
+    "InternalElasticLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+		"Scheme" : "internal",
+		"Subnets" : [
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet1"]}, 
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet2"]}
+		],
+		"LoadBalancerAttributes" : [
+			{ "Key" : "idle_timeout.timeout_seconds", "Value" : "50" }
+		],
+		"SecurityGroups": [{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"InternalELB"]},{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"Admin"]}],
+		"Tags" : [
+		  { "Key" : "key", "Value" : "value" }
+		]
+      }
+    },
+	"InternalListenerHTTP": {
+	  "Type": "AWS::ElasticLoadBalancingV2::Listener",
+	  "Properties": {
+		"DefaultActions": [{
+		  "Type": "forward",
+		  "TargetGroupArn": { "Ref": "AppTargetGroup" }
+		}],
+		"LoadBalancerArn": { "Ref": "InternalElasticLoadBalancer" },
+		"Port": "80",
+		"Protocol": "HTTP"
+	  }
+	},
+	"AppTargetGroup" : {
+	  "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+	  "Properties" : {
+		"HealthCheckIntervalSeconds": 30,
+		"HealthCheckPath": "/elb-healthcheck-app.php",
+		"HealthCheckProtocol": "HTTP",
+		"HealthCheckTimeoutSeconds": 10,
+		"HealthyThresholdCount": 4,
+		"Matcher" : {
+		  "HttpCode" : "200"
+		},
+		"Name": { "Fn::Join": [ "-", [ { "Ref" : "AWS::StackName" },"AppELBTargets"  ] ] },
+
+		"Port": 80,
+		"Protocol": "HTTP",
+		"TargetGroupAttributes": [{
+			"Key": "deregistration_delay.timeout_seconds",
+			"Value": "20"
+		},{
+			"Key": "stickiness.enabled",
+			"Value": "true"
+		},{
+			"Key": "stickiness.lb_cookie.duration_seconds",
+			"Value": "60"
+		},{
+			"Key": "stickiness.type",
+			"Value": "lb_cookie"
+		}],
+		"Targets": [
+		],
+		"UnhealthyThresholdCount": 3,
+		"VpcId": {"Fn::FindInMap" : ["VPCid",{ "Ref" : "AWS::Region" },"ID"]},
+		"Tags" : [
+		  { "Key" : "key", "Value" : "value" }
+		]
+	  }
+	},
+	
+	"AppWebServerGroup" : {
+	   "Type" : "AWS::AutoScaling::AutoScalingGroup",
+	   "Properties" : {
+		  "AvailabilityZones" : [
+			{"Fn::FindInMap" : ["AvailablityZone", { "Ref" : "AWS::Region" }, "zone1"]},
+			{"Fn::FindInMap" : ["AvailablityZone", { "Ref" : "AWS::Region" }, "zone2"]}
+		  ],
+		  "VPCZoneIdentifier": [
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet1"]}, 
+			{"Fn::FindInMap" : ["Subnets",{ "Ref" : "AWS::Region" },"Subnet2"]}
+		  ],
+		  "HealthCheckGracePeriod": "120",
+		  "HealthCheckType": "ELB",
+		  "LaunchConfigurationName" : { "Ref" : "AppLaunchConfig" },
+		  "MinSize" : "1",
+		  "MaxSize" : "3",
+		  "NotificationConfiguration" : {
+			"TopicARN" : { "Ref" : "NotificationTopic" },
+			"NotificationTypes" : [ "autoscaling:EC2_INSTANCE_LAUNCH",
+                                  "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                                  "autoscaling:EC2_INSTANCE_TERMINATE",
+                                  "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"]
+		  },
+		  "TargetGroupARNs" : [ { "Ref" : "AppTargetGroup" } ],
+		  "MetricsCollection": [
+			 {
+				"Granularity": "1Minute",
+				"Metrics": [
+				   "GroupMinSize",
+				   "GroupMaxSize"
+				]
+			 }
+		  ],
+		  "Tags": [{
+			"Key" : "Name",
+			"Value" : {"Fn::Join": ["-", ["WWW App",{ "Ref" : "AWS::StackName" }]]},
+			"PropagateAtLaunch" : "true"
+		  },{
+			"Key" : "SERVICE",
+			"Value" : "www app",
+			"PropagateAtLaunch" : "true"
+		  },{
+			"Key" : "PROJECT",
+			"Value" : { "Ref" : "PROJECT" },
+			"PropagateAtLaunch" : "true"
+		  },{
+			"Key" : "ENVIRONMENT",
+			"Value" : { "Ref" : "ENVIRONMENT" },
+			"PropagateAtLaunch" : "true"
+		  }]
+	   },
+	   "CreationPolicy" : {
+		"ResourceSignal" : {
+		  "Timeout" : "PT15M",
+		  "Count"   : "1"
+		}
+	  },
+	  "UpdatePolicy" : {
+		"AutoScalingRollingUpdate" : {
+			"MaxBatchSize" : "1",
+			"MinInstancesInService" : "1",
+			"PauseTime" : "PT15M",
+			"WaitOnResourceSignals": "true"
+		}
+	  }
+	},
+	"AppLaunchConfig" : {
+	   "Type" : "AWS::AutoScaling::LaunchConfiguration",
+	   "Properties" : {
+	      "AssociatePublicIpAddress" : "true",
+		  "KeyName" : { "Ref" : "KeyName" },
+		  "ImageId" : {
+			 "Fn::FindInMap" : [
+				"WWWAppAMI",
+				{ "Ref" : "AWS::Region" },
+				{
+				   "Fn::FindInMap" : [
+					  "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch"
+				   ]
+				}
+			 ]
+		  },
+		  "IamInstanceProfile": {"Fn::FindInMap" : ["EC2Role","instanceprofile","arn"]},
+		  "InstanceMonitoring": true,
+		  "SecurityGroups": [{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"WWWApp"]},{"Fn::FindInMap" : ["SecurityGroups",{ "Ref" : "AWS::Region" },"Admin"]}],
+		  "InstanceType" : { "Ref" : "InstanceType" },
+          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+				 "#!/bin/bash -xe\n",
+				 "# Install the files and packages from the metadata\n",
+				 
+				 "/opt/aws/bin/cfn-init -v ",
+				 "         --stack ", { "Ref" : "AWS::StackName" },
+				 "         --resource AppLaunchConfig ",
+				 "         --region ", { "Ref" : "AWS::Region" }, "\n",
+				 
+				 "# Download project deploy script and run deployment", "\n",
+				 "/usr/bin/aws s3 cp s3://", { "Ref" : "S3DISTREPO" }, "/", { "Ref" : "PROJECT" }, "/", { "Ref" : "ENVIRONMENT" } , "/www_deploy.sh /home/centos/www_deploy.sh --region ", { "Ref" : "S3DISTREGION" } , "\n",
+				 "/bin/sh /home/centos/www_deploy.sh ", { "Ref" : "PROJECT" }, " ", { "Ref" : "ENVIRONMENT" }, " ", { "Ref" : "S3DISTREPO" }, " ", { "Ref" : "S3DISTREGION" } ,"\n",
+
+				 "# Signal the status from cfn-init\n",
+				 "/opt/aws/bin/cfn-signal -e $? ",
+				 "         --stack ", { "Ref" : "AWS::StackName" },
+				 "         --resource AppWebServerGroup ",
+				 "         --region ", { "Ref" : "AWS::Region" }, "\n"
+		   ]]}}
+	   },
+       "Metadata" : {
+			"AWS::CloudFormation::Init" : {
+				  "config" : {
+					"files" : {
+						"/etc/cfn/cfn-hup.conf" : {
+							"content" : { "Fn::Join" : ["", [
+							  "[main]\n",
+							  "stack=", { "Ref" : "AWS::StackId" }, "\n",
+							  "region=", { "Ref" : "AWS::Region" }, "\n"
+							]]},
+							"mode"    : "000400",
+							"owner"   : "root",
+							"group"   : "root"
+						  },
+						  "/etc/cfn/hooks.d/cfn-auto-reloader.conf" : {
+							"content": { "Fn::Join" : ["", [
+							  "[cfn-auto-reloader-hook]\n",
+							  "triggers=post.update\n",
+							  "path=Resources.AppLaunchConfig.Metadata.AWS::CloudFormation::Init\n",
+							  "action=/opt/aws/bin/cfn-init -v ",
+							  "         --stack ", { "Ref" : "AWS::StackName" },
+							  "         --resource AppLaunchConfig ",
+							  "         --region ", { "Ref" : "AWS::Region" }, "\n",
+							  "runas=root\n"
+							]]}
+						  }
+					},
+					
+					"services" : {
+					  "sysvinit" : {
+						"nginx" : { "enabled" : "true", "ensureRunning" : "true" },
+						"php71-php-fpm" : { "enabled" : "true", "ensureRunning" : "true" },
+						"cfn-hup" : { "enabled" : "true", "ensureRunning" : "true",
+									  "files" : ["/etc/cfn/cfn-hup.conf", "/etc/cfn/hooks.d/cfn-auto-reloader.conf"]}
+					  }
+					}
+				  }
+		}
+      }
+	},
+    "AppWebServerScaleUpPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "AppWebServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "1"
+      }
+    },
+    "AppWebServerScaleDownPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "AppWebServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "-1"
+      }
+    },
+    "AppCPUAlarmHigh": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-up if CPU > 90% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "90",
+        "AlarmActions": [ { "Ref": "AppWebServerScaleUpPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "AppWebServerGroup" }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+    "AppCPUAlarmLow": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "70",
+        "AlarmActions": [ { "Ref": "AppWebServerScaleDownPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "AppWebServerGroup" }
+          }
+        ],
+        "ComparisonOperator": "LessThanThreshold"
+      }
+    }
+
+  },
+
+
+  "Outputs": {
+    "CNAME": {
+      "Description": "DNS CNAME record",
+      "Value": { "Fn::Join": [ "", [ "", { "Fn::GetAtt": [ "PublicElasticLoadBalancer", "DNSName" ] } ] ] }
+    }
+  }
+}
